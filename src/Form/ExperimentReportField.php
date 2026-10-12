@@ -47,28 +47,8 @@ class ExperimentReportField extends FormField
         $chartId = 'abtesting-chart-' . $this->getName() . '-' . $experiment->ID;
         $chartPayload = json_encode($this->buildChartPayload($experiment), JSON_UNESCAPED_SLASHES);
 
-        $rows = '';
-        foreach ($summary as $row) {
-            $rows .= sprintf(
-                '<tr><td>%s</td><td>%d</td><td>%d</td><td>%.1f%%</td></tr>',
-                htmlspecialchars((string) $row['title'], ENT_QUOTES),
-                $row['exposures'],
-                $row['conversions'],
-                $row['rate']
-            );
-        }
-
         if ($this->getName() === 'Summary') {
-            return <<<HTML
-<div class="abtesting-report">
-  <table class="abtesting-summary-table">
-    <thead>
-      <tr><th>Variation</th><th>Exposures</th><th>Conversions</th><th>Rate</th></tr>
-    </thead>
-    <tbody>{$rows}</tbody>
-  </table>
-</div>
-HTML;
+            return $this->renderSummaryTable($experiment, $summary);
         }
 
         return <<<HTML
@@ -80,11 +60,126 @@ HTML;
     }
 
     /**
-     * @return list<array{key:string,title:string,exposures:int,conversions:int,rate:float}>
+     * @param list<array{key:string,title:string,exposures:int,conversions:int,rate:float,is_control:bool}> $summary
+     */
+    private function renderSummaryTable(ABTestExperiment $experiment, array $summary): string
+    {
+        $bestRate = 0.0;
+        $totalExposures = 0;
+        $totalConversions = 0;
+
+        foreach ($summary as $row) {
+            $bestRate = max($bestRate, $row['rate']);
+            $totalExposures += $row['exposures'];
+            $totalConversions += $row['conversions'];
+        }
+
+        $rows = '';
+        foreach ($summary as $row) {
+            $isLeader = $bestRate > 0 && abs($row['rate'] - $bestRate) < 0.0001;
+            $isWinner = $experiment->WinningVariationKey
+                && $experiment->WinningVariationKey === $row['key'];
+            $rowClass = trim(
+                ($isLeader ? 'is-leader' : '')
+                . ($isWinner ? ' is-winner' : '')
+                . ($row['is_control'] ? ' is-control' : '')
+            );
+
+            $badges = '';
+            if ($isWinner) {
+                $badges .= '<span class="abtesting-badge abtesting-badge--winner">Winner</span>';
+            } elseif ($isLeader && $row['exposures'] > 0) {
+                $badges .= '<span class="abtesting-badge abtesting-badge--leader">Leading</span>';
+            }
+            if ($row['is_control']) {
+                $badges .= '<span class="abtesting-badge abtesting-badge--control">Control</span>';
+            }
+
+            $rateWidth = $bestRate > 0 ? min(100, ($row['rate'] / $bestRate) * 100) : 0;
+
+            $rows .= sprintf(
+                '<tr class="%s">'
+                . '<td class="abtesting-summary-table__variation">'
+                . '<div class="abtesting-summary-table__heading">'
+                . '<span class="abtesting-summary-table__title">%s</span>%s'
+                . '</div>'
+                . '<span class="abtesting-summary-table__key">%s</span></td>'
+                . '<td class="abtesting-summary-table__num">%s</td>'
+                . '<td class="abtesting-summary-table__num">%s</td>'
+                . '<td class="abtesting-summary-table__rate">'
+                . '<div class="abtesting-rate">'
+                . '<span class="abtesting-rate__value">%.1f%%</span>'
+                . '<span class="abtesting-rate__bar" style="--abtesting-rate:%s%%"></span>'
+                . '</div></td>'
+                . '</tr>',
+                htmlspecialchars($rowClass, ENT_QUOTES),
+                htmlspecialchars((string) $row['title'], ENT_QUOTES),
+                $badges,
+                htmlspecialchars((string) $row['key'], ENT_QUOTES),
+                number_format($row['exposures']),
+                number_format($row['conversions']),
+                $row['rate'],
+                number_format($rateWidth, 1, '.', '')
+            );
+        }
+
+        $overallRate = $totalExposures > 0 ? ($totalConversions / $totalExposures) * 100 : 0.0;
+
+        return <<<HTML
+<div class="abtesting-report abtesting-report--summary">
+  <div class="abtesting-summary-panel">
+    <div class="abtesting-summary-stats">
+      <div class="abtesting-stat">
+        <span class="abtesting-stat__label">Total exposures</span>
+        <span class="abtesting-stat__value">{$this->formatInt($totalExposures)}</span>
+      </div>
+      <div class="abtesting-stat">
+        <span class="abtesting-stat__label">Total conversions</span>
+        <span class="abtesting-stat__value">{$this->formatInt($totalConversions)}</span>
+      </div>
+      <div class="abtesting-stat">
+        <span class="abtesting-stat__label">Overall rate</span>
+        <span class="abtesting-stat__value">{$this->formatRate($overallRate)}</span>
+      </div>
+      <div class="abtesting-stat">
+        <span class="abtesting-stat__label">Variations</span>
+        <span class="abtesting-stat__value">{$this->formatInt(count($summary))}</span>
+      </div>
+    </div>
+    <table class="abtesting-summary-table">
+      <thead>
+        <tr>
+          <th scope="col">Variation</th>
+          <th scope="col" class="abtesting-summary-table__num">Exposures</th>
+          <th scope="col" class="abtesting-summary-table__num">Conversions</th>
+          <th scope="col">Rate</th>
+        </tr>
+      </thead>
+      <tbody>{$rows}</tbody>
+    </table>
+  </div>
+</div>
+HTML;
+    }
+
+    private function formatInt(int $value): string
+    {
+        return number_format($value);
+    }
+
+    private function formatRate(float $value): string
+    {
+        return number_format($value, 1) . '%';
+    }
+
+    /**
+     * @return list<array{key:string,title:string,exposures:int,conversions:int,rate:float,is_control:bool}>
      */
     private function buildSummary(ABTestExperiment $experiment): array
     {
         $rows = [];
+        $controlKey = $experiment->ControlKey ?: 'control';
+
         foreach ($experiment->getVariationTitleMap() as $key => $title) {
             $exposures = ABTestData::get()->filter([
                 'ExperimentID' => $experiment->ID,
@@ -102,6 +197,7 @@ HTML;
                 'exposures' => $exposures,
                 'conversions' => $conversions,
                 'rate' => $exposures > 0 ? ($conversions / $exposures) * 100 : 0.0,
+                'is_control' => $key === $controlKey,
             ];
         }
 
