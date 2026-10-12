@@ -48,7 +48,7 @@ use Symbiote\GridFieldExtensions\GridFieldOrderableRows;
  * @method SiteTree TestedPage()
  * @method SiteTree ConversionPage()
  * @method HasManyList<ABTestVariation> Variations()
- * @method HasManyList<ABTestData> Data()
+ * @method HasManyList<ABTestData> Results()
  */
 class ABTestExperiment extends DataObject implements PermissionProvider
 {
@@ -86,7 +86,8 @@ class ABTestExperiment extends DataObject implements PermissionProvider
 
     private static array $has_many = [
         'Variations' => ABTestVariation::class,
-        'Data' => ABTestData::class,
+        // Named Results (not Data) — DataObject scaffolding treats "Data" specially in SS6.
+        'Results' => ABTestData::class,
     ];
 
     private static array $defaults = [
@@ -123,7 +124,7 @@ class ABTestExperiment extends DataObject implements PermissionProvider
             'TestedPageID',
             'ConversionPageID',
             'Variations',
-            'Data',
+            'Results',
             'StartDate',
             'EndDate',
             'WinningVariationKey',
