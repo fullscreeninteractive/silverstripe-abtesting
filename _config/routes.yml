@@ -1,0 +1,9 @@
+---
+Name: abtesting-routes
+After:
+  - '#rootroutes'
+  - '#coreroutes'
+---
+SilverStripe\Control\Director:
+  rules:
+    'abtesting//$Action/$ID': FullscreenInteractive\ABTesting\Control\TrackingController

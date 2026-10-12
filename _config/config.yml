@@ -1,0 +1,24 @@
+---
+Name: abtesting
+---
+SilverStripe\Admin\LeftAndMain:
+  extra_requirements_javascript:
+    - 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
+    - 'fullscreeninteractive/silverstripe-abtesting:client/dist/js/admin-reports.js'
+  extra_requirements_css:
+    - 'fullscreeninteractive/silverstripe-abtesting:client/dist/css/abtesting.css'
+
+FullscreenInteractive\ABTesting\Service\TrackingService:
+  bridges:
+    - FullscreenInteractive\ABTesting\Bridge\DataLayerBridge
+    - FullscreenInteractive\ABTesting\Bridge\WebhookBridge
+
+FullscreenInteractive\ABTesting\Bridge\DataLayerBridge:
+  event_exposure: ab_test_exposure
+  event_conversion: ab_test_conversion
+
+FullscreenInteractive\ABTesting\Bridge\WebhookBridge:
+  # Global webhook endpoints that receive every experiment event.
+  # Experiments may also define their own WebhookURL in the CMS.
+  endpoints: []
+  timeout: 5

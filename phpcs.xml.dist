@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<ruleset name="fullscreeninteractive/silverstripe-abtesting">
+    <description>Coding standard for the A/B testing module</description>
+
+    <file>src</file>
+    <file>tests</file>
+
+    <arg value="sp"/>
+    <arg name="colors"/>
+
+    <!-- Global-namespace Page/PageController test stubs required by silverstripe/cms -->
+    <exclude-pattern>tests/php/Page.php</exclude-pattern>
+
+    <rule ref="PSR12"/>
+
+    <!-- Silverstripe FormField::Field() API is intentionally not camelCase -->
+    <rule ref="PSR1.Methods.CamelCapsMethodName.NotCamelCaps">
+        <exclude-pattern>*/Form/*Field.php</exclude-pattern>
+    </rule>
+</ruleset>

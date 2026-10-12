@@ -1,0 +1,10 @@
+---
+Name: abtesting-extensions
+---
+PageController:
+  extensions:
+    - FullscreenInteractive\ABTesting\Extension\PageControllerExtension
+
+Page:
+  extensions:
+    - FullscreenInteractive\ABTesting\Extension\PageExtension
